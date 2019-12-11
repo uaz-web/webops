@@ -1,0 +1,95 @@
+#===============================================================================
+#   ______        ______  
+#  / ___\ \      / / ___| 
+# | |    \ \ /\ / /\___ \ 
+# | |___  \ V  V /  ___) |
+#  \____|  \_/\_/  |____/ 
+#                        
+#===============================================================================
+
+#===============================================================================
+# Aliases
+#===============================================================================
+alias t='terminus'
+alias dashboard='terminus dashboard:view'
+
+#===============================================================================
+# Functions
+#===============================================================================
+cws-cc() {
+  `terminus drush ${1} -- cc all && t env:clear-cache ${1}`
+}
+
+cws-clone() {
+  `terminus connection:info --field 'Git Command' ${1}.dev`
+}
+
+cws-code() {
+  if [[ ! -d ${HOME}/Sites/pantheon ]]; then
+    mkdir -p ${HOME}/Sites/pantheon
+  fi
+
+  if [[ -d ${HOME}/Sites/pantheon/${1} ]]; then
+    cd ${HOME}/Sites/pantheon/${1}
+  elif [[ -f ${HOME}/Sites/pantheon/${1}.tar.gz ]]; then
+    cd ${HOME}/Sites/pantheon \
+    && tar zxvf ${1}.tar.gz \
+    && rm ${1}.tar.gz \
+    && cd ${1}
+  else
+    cd ${HOME}/Sites/pantheon \
+    && `terminus connection:info --field 'Git Command' ${1}.dev` \
+    && cd ${1}
+  fi
+}
+
+cws-code-compress() {
+  (
+    cd ${HOME}/Sites/pantheon
+    for SITE in `ls -d */ | sed 's@/$@@g'`; do
+      echo "compressing ${SITE}"
+      tar zcf ${SITE}.tar.gz ${SITE} \
+      && rm -rf ${SITE}
+    done
+  )
+}
+
+cws-sftp() {
+  `terminus connection:info --field 'SFTP Command' ${1}`
+}
+
+cws-mysql() {
+  terminus env:wake ${1}
+  `terminus connection:info --field 'MySQL Command' ${1}`
+}
+
+cws-revert-deployment() {
+  (
+    set -e
+
+    git pull
+    CURRENT_TAG=$(git tag | grep pantheon_live_ | sort -k1.15n | tail -1)
+    PREVIOUS_TAG="pantheon_live_$(expr `echo ${CURRENT_TAG} | awk -F '_' '{print $3}'` - 1)"
+    NEW_TAG="pantheon_live_$(expr `echo ${CURRENT_TAG} | awk -F '_' '{print $3}'` + 1)"
+    REVERT_TO_COMMIT=$(git rev-list -n 1 ${PREVIOUS_TAG})
+
+    echo "Current live tag: ${CURRENT_TAG}"
+    echo "Previous live tag: ${PREVIOUS_TAG}"
+    echo "Creating new tag ${NEW_TAG} on commit ${REVERT_TO_COMMIT}"
+
+    git tag ${NEW_TAG} ${REVERT_TO_COMMIT}
+
+    echo "\n=================================================="
+    git --no-pager show -s ${REVERT_TO_COMMIT}
+    echo "==================================================\n"
+
+    echo "To deploy the revert:\t\t\tgit push origin ${NEW_TAG}"
+    echo "To abort and delete the revert tag:\tgit tag -d ${NEW_TAG}"
+    echo 'To reset tags to origin:\t\tgit tag -d $(git tag -l) && git fetch'
+  )
+}
+
+cws-move-domain() {
+  terminus domain:remove ${2} ${1}
+  terminus domain:add ${3} ${1}
+}
