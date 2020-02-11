@@ -17,7 +17,7 @@ alias dashboard='terminus dashboard:view'
 # Functions
 #===============================================================================
 cws-cc() {
-  `terminus drush ${1} -- cc all && t env:clear-cache ${1}`
+  `terminus drush ${1} -- cc all && terminus env:clear-cache ${1}`
 }
 
 cws-clone() {
